@@ -429,38 +429,35 @@ namespace {
 TVector<THolder<IMetric>> TMultiRMSEMetric::Create(const TMetricConfig& config) {
     return AsVector(MakeHolder<TMultiRMSEMetric>(config.params));
 }
-
-TMetricHolder TMultiRMSEMetric::EvalSingleThread(
-    TConstArrayRef<TVector<double>> approx,
-    TConstArrayRef<TVector<double>> approxDelta,
-    TConstArrayRef<TConstArrayRef<float>> target,
-    TConstArrayRef<float> weight,
-    int begin,
-    int end
-) const {
-    const auto evalImpl = [&](bool useWeights, bool hasDelta) {
-        const auto realApprox = [&](int dim, int idx) { return approx[dim][idx] + (hasDelta ? approxDelta[dim][idx] : 0); };
-        const auto realWeight = [&](int idx) { return useWeights ? weight[idx] : 1; };
-
-        TMetricHolder error(2);
-        for (auto dim : xrange(target.size())) {
+ TMetricHolder TMultiRMSEMetric::EvalSingleThread(
+        TConstArrayRef<TVector<double>> approx,
+        TConstArrayRef<TVector<double>> approxDelta,
+        TConstArrayRef<TConstArrayRef<float>> target,
+        TConstArrayRef<float> weight,
+        int begin,
+        int end
+    ) const {
+        const auto evalImpl = [&](bool useWeights, bool hasDelta) {
+            const auto realApprox = [&](int dim, int idx) { return approx[dim][idx] + (hasDelta ? approxDelta[dim][idx] : 0); };
+            const auto realWeight = [&](int idx) { return useWeights ? weight[idx] : 1; };
+   
+            TMetricHolder error(2);
             for (auto i : xrange(begin, end)) {
-                error.Stats[0] += realWeight(i) * Sqr(realApprox(dim, i) - target[dim][i]);
+                error.Stats[0] += realWeight(i) * (0.39908993417 + std::log(Stddev) + realApprox(1, i) + 0.5 * std::exp(-2 * realApprox(1, i)) * Sqr(realApprox(0, i) + Mean - tar       get[0][i]) / Sqr(Stddev));
             }
-        }
-        for (auto i : xrange(begin, end)) {
-            error.Stats[1] += realWeight(i);
-        }
-        return error;
-    };
-
-    return DispatchGenericLambda(evalImpl, !weight.empty(), !approxDelta.empty());
-}
-
-double TMultiRMSEMetric::GetFinalError(const TMetricHolder& error) const {
-    return error.Stats[1] == 0 ? 0 : sqrt(error.Stats[0] / error.Stats[1]);
-}
-
+            for (auto i : xrange(begin, end)) {
+                error.Stats[1] += realWeight(i);
+            }
+            return error;
+        };
+   
+        return DispatchGenericLambda(evalImpl, !weight.empty(), !approxDelta.empty());
+    }
+   
+    double TMultiRMSEMetric::GetFinalError(const TMetricHolder& error) const {
+        return error.Stats[1] == 0 ? 0 : error.Stats[0] / error.Stats[1];
+    }
+   
 void TMultiRMSEMetric::GetBestValue(EMetricBestValue* valueType, float* /*bestValue*/) const {
     *valueType = EMetricBestValue::Min;
 }
