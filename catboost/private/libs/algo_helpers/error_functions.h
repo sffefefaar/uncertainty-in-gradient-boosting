@@ -194,26 +194,26 @@ public:
     }
 
     void CalcDers(
-        TConstArrayRef<double> approx,
-        TConstArrayRef<float> target,
-        float weight,
-        TVector<double>* der,
-        THessianInfo* der2
-    ) const override {
-        const int dim = target.size();
-        for (auto i : xrange(dim)) {
-            (*der)[i] = weight * (target[i] - approx[i]);
-        }
-
-        if (der2 != nullptr) {
-            Y_ASSERT(der2->HessianType == EHessianType::Diagonal &&
-                     der2->ApproxDimension == dim);
-
-            for (auto i : xrange(dim)) {
-                der2->Data[i] = -weight;
-            }
-        }
-    }
+          TConstArrayRef<double> approx,
+          TConstArrayRef<float> target,
+          float weight,
+          TVector<double>* der,
+          THessianInfo* der2
+      ) const override {
+          const int dim = target.size();
+          const double diff = (target[0] - approx[0] - Mean);
+          const double prec = std::exp(-2 * approx[1]) / Stddev / Stddev;
+          (*der)[0] = weight * diff;
+          (*der)[1] = weight * (diff * diff * prec - 1);
+ 
+          if (der2 != nullptr) {
+              Y_ASSERT(der2->HessianType == EHessianType::Diagonal &&
+                       der2->ApproxDimension == dim);
+ 
+              der2->Data[0] = -weight;.
+              der2->Data[1] = -weight;
+          }
+      }
 };
 
 class TCrossEntropyError final : public IDerCalcer {
